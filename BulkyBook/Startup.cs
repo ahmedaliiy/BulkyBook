@@ -1,4 +1,4 @@
-using BulkyBook.Data;
+using BulkyBook.DataAccess.Data;
 using BulkyBook.DataAccess.Repository;
 using BulkyBook.DataAccess.Repository.IRepository;
 using Microsoft.AspNetCore.Builder;

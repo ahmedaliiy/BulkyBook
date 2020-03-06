@@ -1,4 +1,4 @@
-﻿using BulkyBook.Data;
+﻿using BulkyBook.DataAccess.Data;
 using BulkyBook.DataAccess.Repository.IRepository;
 using Microsoft.EntityFrameworkCore;
 using System;
@@ -10,6 +10,7 @@ namespace BulkyBook.DataAccess.Repository
 {
     public class Repository<T> : IRepository<T> where T : class
     {
+
         private readonly ApplicationDbContext _db;
         internal DbSet<T> dbSet;
 
@@ -18,6 +19,7 @@ namespace BulkyBook.DataAccess.Repository
             _db = db;
             this.dbSet = _db.Set<T>();
         }
+
         public void Add(T entity)
         {
             dbSet.Add(entity);
@@ -31,10 +33,12 @@ namespace BulkyBook.DataAccess.Repository
         public IEnumerable<T> GetAll(Expression<Func<T, bool>> filter = null, Func<IQueryable<T>, IOrderedQueryable<T>> orderBy = null, string includeProperties = null)
         {
             IQueryable<T> query = dbSet;
+
             if (filter != null)
             {
                 query = query.Where(filter);
             }
+
             if (includeProperties != null)
             {
                 foreach (var includeProp in includeProperties.Split(new char[] { ',' }, StringSplitOptions.RemoveEmptyEntries))
@@ -42,6 +46,7 @@ namespace BulkyBook.DataAccess.Repository
                     query = query.Include(includeProp);
                 }
             }
+
             if (orderBy != null)
             {
                 return orderBy(query).ToList();
@@ -52,10 +57,12 @@ namespace BulkyBook.DataAccess.Repository
         public T GetFirstOrDefault(Expression<Func<T, bool>> filter = null, string includeProperties = null)
         {
             IQueryable<T> query = dbSet;
+
             if (filter != null)
             {
                 query = query.Where(filter);
             }
+
             if (includeProperties != null)
             {
                 foreach (var includeProp in includeProperties.Split(new char[] { ',' }, StringSplitOptions.RemoveEmptyEntries))
@@ -63,6 +70,8 @@ namespace BulkyBook.DataAccess.Repository
                     query = query.Include(includeProp);
                 }
             }
+
+
             return query.FirstOrDefault();
         }
 

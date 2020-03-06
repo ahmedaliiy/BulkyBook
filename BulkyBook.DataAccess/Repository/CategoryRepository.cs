@@ -1,4 +1,4 @@
-﻿using BulkyBook.Data;
+﻿using BulkyBook.DataAccess.Data;
 using BulkyBook.DataAccess.Repository.IRepository;
 using BulkyBook.Models;
 using System.Linq;
@@ -16,10 +16,10 @@ namespace BulkyBook.DataAccess.Repository
 
         public void Update(Category category)
         {
-            var ObjFromDb = _db.Categories.FirstOrDefault(s => s.Id == category.Id);
-            if (ObjFromDb != null)
+            var objFromDb = _db.Categories.FirstOrDefault(s => s.Id == category.Id);
+            if (objFromDb != null)
             {
-                ObjFromDb.Name = category.Name;
+                objFromDb.Name = category.Name;
                 _db.SaveChanges();
             }
         }

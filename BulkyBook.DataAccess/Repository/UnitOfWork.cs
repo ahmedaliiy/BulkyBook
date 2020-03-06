@@ -1,4 +1,4 @@
-﻿using BulkyBook.Data;
+﻿using BulkyBook.DataAccess.Data;
 using BulkyBook.DataAccess.Repository.IRepository;
 
 namespace BulkyBook.DataAccess.Repository
@@ -15,7 +15,6 @@ namespace BulkyBook.DataAccess.Repository
         }
 
         public ICategoryRepository Category { get; private set; }
-
         public ISP_Call SP_Call { get; private set; }
 
         public void Dispose()
