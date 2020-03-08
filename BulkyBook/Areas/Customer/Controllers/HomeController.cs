@@ -26,6 +26,17 @@ namespace BulkyBook.Areas.Customer.Controllers
             return View(productList);
         }
 
+        public IActionResult Details(int id)
+        {
+            var productFromDB = _unitOfWork.Product.GetFirstOrDefault(u => u.Id == id, includeProperties: "Category,CoverType");
+            ShoppingCard cardObj = new ShoppingCard()
+            {
+                Product = productFromDB,
+                ProductId = productFromDB.Id
+            };
+            return View(cardObj);
+        }
+
         public IActionResult Privacy()
         {
             return View();
