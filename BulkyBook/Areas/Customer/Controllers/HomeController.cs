@@ -1,10 +1,12 @@
 ﻿using BulkyBook.DataAccess.Repository.IRepository;
 using BulkyBook.Models;
 using BulkyBook.Models.ViewModels;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Security.Claims;
 
 namespace BulkyBook.Areas.Customer.Controllers
 {
@@ -35,6 +37,49 @@ namespace BulkyBook.Areas.Customer.Controllers
                 ProductId = productFromDB.Id
             };
             return View(cardObj);
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        [Authorize]
+        public IActionResult Details(ShoppingCard cardObject)
+        {
+            cardObject.Id = 0;
+            if (ModelState.IsValid)
+            {
+                //then we will add to card
+                var claimsIdentity = (ClaimsIdentity)User.Identity;
+                var claim = claimsIdentity.FindFirst(ClaimTypes.NameIdentifier);
+                cardObject.ApplicationUserId = claim.Value;
+
+                ShoppingCard cardFromDb = _unitOfWork.ShoppingCard.GetFirstOrDefault(
+                    u => u.ApplicationUserId == cardObject.ApplicationUserId && u.ProductId == cardObject.ProductId,
+                    includeProperties: "Product"
+                    );
+
+                if(cardFromDb == null)
+                {
+                    //no records exists in db for that product for that user
+                    _unitOfWork.ShoppingCard.Add(cardObject);
+                }
+                else
+                {
+                    cardFromDb.Count += cardObject.Count;
+                    //_unitOfWork.ShoppingCard.Update(cardFromDb);
+                }
+                _unitOfWork.Save();
+                return RedirectToAction(nameof(Index));
+            }
+            else
+            {
+                var productFromDB = _unitOfWork.Product.GetFirstOrDefault(u => u.Id == cardObject.Id, includeProperties: "Category,CoverType");
+                ShoppingCard cardObj = new ShoppingCard()
+                {
+                    Product = productFromDB,
+                    ProductId = productFromDB.Id
+                };
+                return View(cardObj);
+            }
         }
 
         public IActionResult Privacy()
