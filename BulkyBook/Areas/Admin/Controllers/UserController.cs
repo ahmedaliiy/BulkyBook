@@ -1,8 +1,8 @@
 ﻿using BulkyBook.DataAccess.Data;
-using BulkyBook.DataAccess.Repository.IRepository;
 using BulkyBook.Models;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using System;
 using System.Linq;
 
 namespace BulkyBook.Areas.Admin.Controllers
@@ -27,15 +27,15 @@ namespace BulkyBook.Areas.Admin.Controllers
         [HttpGet]
         public IActionResult GetAll()
         {
-            var userList = _db.ApplicationUsers.Include(u=>u.Company).ToList();
+            var userList = _db.ApplicationUsers.Include(u => u.Company).ToList();
             var userRole = _db.UserRoles.ToList();
             var roles = _db.Roles.ToList();
 
-            foreach(var user in userList)
+            foreach (var user in userList)
             {
                 var roleId = userRole.FirstOrDefault(u => u.UserId == user.Id).RoleId;
                 user.Role = roles.FirstOrDefault(u => u.Id == roleId).Name;
-                if(user.Company == null)
+                if (user.Company == null)
                 {
                     user.Company = new Company()
                     {
@@ -45,6 +45,21 @@ namespace BulkyBook.Areas.Admin.Controllers
             }
 
             return Json(new { data = userList });
+        }
+
+        [HttpPost]
+        public IActionResult LockUnlock([FromBody] string id)
+        {
+            var objFromDb = _db.ApplicationUsers.FirstOrDefault(u => u.Id == id);
+            if (objFromDb == null)
+                return Json(new { success = false, message = "Error while Locking/Unlocking" });
+            if (objFromDb.LockoutEnd != null && objFromDb.LockoutEnd > DateTime.Now)
+                objFromDb.LockoutEnd = DateTime.Now; // user is currently locked we will unlock then
+            else
+                objFromDb.LockoutEnd = DateTime.Now.AddYears(1000);
+            _db.SaveChanges();
+            return Json(new { success = true, message = "Operation Successful." });
+
         }
         #endregion
     }
