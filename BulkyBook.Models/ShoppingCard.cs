@@ -19,7 +19,7 @@ namespace BulkyBook.Models
         [ForeignKey("ApplicationUserId")]
         public ApplicationUser ApplicationUser { get; set; }
 
-        public string ProductId { get; set; }
+        public int ProductId { get; set; }
 
         [ForeignKey("ProductId")]
         public Product Product { get; set; }
