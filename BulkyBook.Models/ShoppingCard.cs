@@ -28,6 +28,6 @@ namespace BulkyBook.Models
         public int Count { get; set; }
 
         [NotMapped]
-        public double Price { get; set; }
+        public Double Price { get; set; }
     }
 }
