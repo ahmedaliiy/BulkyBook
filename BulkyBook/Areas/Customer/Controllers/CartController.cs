@@ -1,4 +1,5 @@
 ﻿using BulkyBook.DataAccess.Repository.IRepository;
+using BulkyBook.Models;
 using BulkyBook.Models.ViewModels;
 using BulkyBook.Utility;
 using Microsoft.AspNetCore.Http;
@@ -6,6 +7,9 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.UI.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.WebUtilities;
+using Stripe;
+using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Security.Claims;
 using System.Text;
@@ -21,6 +25,7 @@ namespace BulkyBook.Areas.Customer.Controllers
         private readonly IEmailSender _emailSender;
         private readonly UserManager<IdentityUser> _userManager;
 
+        [BindProperty]
         public ShoppingCardVM shoppingCardVM { get; set; }
         public CartController(IUnitOfWork unitOfWork, IEmailSender emailSender, UserManager<IdentityUser> userManager)
         {
@@ -150,6 +155,88 @@ namespace BulkyBook.Areas.Customer.Controllers
             shoppingCardVM.OrderHeader.PostalCode = shoppingCardVM.OrderHeader.ApplicationUser.PostalCode;
 
             return View(shoppingCardVM);
+        }
+
+        [HttpPost]
+        [ActionName("Summary")]
+        [ValidateAntiForgeryToken]
+        public IActionResult SummaryPost(string stripeToken)
+        {
+            var claimsIdentity = (ClaimsIdentity)User.Identity;
+            var claim = claimsIdentity.FindFirst(ClaimTypes.NameIdentifier);
+            shoppingCardVM.OrderHeader.ApplicationUser = _unitOfWork.ApplicationUser.GetFirstOrDefault(c => c.Id == claim.Value, includeProperties: "Company");
+            shoppingCardVM.ListCard = _unitOfWork.ShoppingCard.GetAll(c => c.ApplicationUserId == claim.Value, includeProperties: "Product");
+            shoppingCardVM.OrderHeader.PaymentStatus = SD.PaymentStatusPending;
+            shoppingCardVM.OrderHeader.OrderStatus = SD.StatusPending;
+            shoppingCardVM.OrderHeader.ApplicationUserId = claim.Value;
+            shoppingCardVM.OrderHeader.OrderDate = DateTime.Now;
+
+            _unitOfWork.OrderHeader.Add(shoppingCardVM.OrderHeader);
+            _unitOfWork.Save();
+
+            List<OrderDetails> orderDetailsList = new List<OrderDetails>();
+            foreach (var item in shoppingCardVM.ListCard)
+            {
+                item.Price = SD.GetPriceBasedOnQuantity(item.Count, item.Product.Price, item.Product.Price50, item.Product.Price100);
+                OrderDetails orderDetails = new OrderDetails()
+                {
+                    ProductId = item.ProductId,
+                    OrderId = shoppingCardVM.OrderHeader.Id,
+                    Price = item.Price,
+                    Count = item.Count
+                };
+                shoppingCardVM.OrderHeader.OrderTotal += orderDetails.Count * orderDetails.Price;
+                _unitOfWork.OrderDetails.Add(orderDetails);
+                _unitOfWork.Save();
+            }
+            _unitOfWork.ShoppingCard.RemoveRange(shoppingCardVM.ListCard);
+            _unitOfWork.Save();
+            HttpContext.Session.SetInt32(SD.ssShoppingCard, 0);
+
+            if (stripeToken == null)
+            {
+                //order will be created for delayed payment for authorized company
+                shoppingCardVM.OrderHeader.PaymentDueDate = DateTime.Now.AddDays(10);
+                shoppingCardVM.OrderHeader.PaymentStatus = SD.PaymentStatusDelayedPayment;
+                shoppingCardVM.OrderHeader.OrderStatus = SD.StatusApproved;
+            }
+            else
+            {
+                //process the payment
+                var options = new ChargeCreateOptions
+                {
+                    Amount = Convert.ToInt32(shoppingCardVM.OrderHeader.OrderTotal * 100),
+                    Currency = "usd",
+                    Description = "Order ID : " + shoppingCardVM.OrderHeader.Id,
+                    Source = stripeToken
+                };
+
+                var service = new ChargeService();
+                Charge charge = service.Create(options);
+
+                if(charge.BalanceTransactionId == null)
+                {
+                    shoppingCardVM.OrderHeader.PaymentStatus = SD.PaymentStatusRejected;
+                }
+                else
+                {
+                    shoppingCardVM.OrderHeader.TransactionId = charge.BalanceTransactionId;
+                }
+                if (charge.Status.ToLower() == "succeeded")
+                {
+                    shoppingCardVM.OrderHeader.PaymentStatus = SD.PaymentStatusApproved;
+                    shoppingCardVM.OrderHeader.OrderStatus = SD.StatusApproved;
+                    shoppingCardVM.OrderHeader.PayementDate = DateTime.Now;
+                }
+
+            }
+            _unitOfWork.Save();
+            return RedirectToAction("OrderConfirmation", "Cart", new { id = shoppingCardVM.OrderHeader.Id });
+        }
+
+        public IActionResult OrderConfirmation(int id)
+        {
+            return View(id);
         }
     }
 }
