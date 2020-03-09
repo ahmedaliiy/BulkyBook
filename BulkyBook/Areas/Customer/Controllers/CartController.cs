@@ -1,10 +1,12 @@
 ﻿using BulkyBook.DataAccess.Repository.IRepository;
 using BulkyBook.Models.ViewModels;
 using BulkyBook.Utility;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.UI.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.WebUtilities;
+using System.Linq;
 using System.Security.Claims;
 using System.Text;
 using System.Text.Encodings.Web;
@@ -34,14 +36,14 @@ namespace BulkyBook.Areas.Customer.Controllers
             shoppingCardVM = new ShoppingCardVM()
             {
                 OrderHeader = new Models.OrderHeader(),
-                ListCard = _unitOfWork.ShoppingCard.GetAll(u => u.ApplicationUserId == claim.Value,includeProperties:"Product")
+                ListCard = _unitOfWork.ShoppingCard.GetAll(u => u.ApplicationUserId == claim.Value, includeProperties: "Product")
             };
 
             shoppingCardVM.OrderHeader.OrderTotal = 0;
             shoppingCardVM.OrderHeader.ApplicationUser = _unitOfWork.ApplicationUser
                 .GetFirstOrDefault(u => u.Id == claim.Value, includeProperties: "Company");
 
-            foreach(var list in shoppingCardVM.ListCard)
+            foreach (var list in shoppingCardVM.ListCard)
             {
                 list.Price = SD.GetPriceBasedOnQuantity(list.Count, list.Product.Price, list.Product.Price50, list.Product.Price100);
                 shoppingCardVM.OrderHeader.OrderTotal += (list.Price * list.Count);
@@ -78,6 +80,47 @@ namespace BulkyBook.Areas.Customer.Controllers
 
             ModelState.AddModelError(string.Empty, "Verification email sent.please check your email");
             return RedirectToAction("Index");
+        }
+
+        public IActionResult Plus(int cartId)
+        {
+            var cart = _unitOfWork.ShoppingCard.GetFirstOrDefault(c => c.Id == cartId, includeProperties: "Product");
+            cart.Count += 1;
+            cart.Price = SD.GetPriceBasedOnQuantity(cart.Count, cart.Product.Price, cart.Product.Price50, cart.Product.Price100);
+            _unitOfWork.Save();
+            return RedirectToAction(nameof(Index));
+        }
+
+        public IActionResult Minus(int cartId)
+        {
+            var cart = _unitOfWork.ShoppingCard.GetFirstOrDefault(c => c.Id == cartId, includeProperties: "Product");
+
+            if (cart.Count == 1)
+            {
+                var cnt = _unitOfWork.ShoppingCard.GetAll(u => u.ApplicationUserId == cart.ApplicationUserId).ToList().Count();
+                _unitOfWork.ShoppingCard.Remove(cart);
+                _unitOfWork.Save();
+                HttpContext.Session.SetInt32(SD.ssShoppingCard, cnt - 1);
+            }
+            else
+            {
+                cart.Count -= 1;
+                cart.Price = SD.GetPriceBasedOnQuantity(cart.Count, cart.Product.Price, cart.Product.Price50, cart.Product.Price100);
+                _unitOfWork.Save();
+            }
+            return RedirectToAction(nameof(Index));
+        }
+
+        public IActionResult Remove(int cartId)
+        {
+            var cart = _unitOfWork.ShoppingCard.GetFirstOrDefault(c => c.Id == cartId, includeProperties: "Product");
+
+            var cnt = _unitOfWork.ShoppingCard.GetAll(u => u.ApplicationUserId == cart.ApplicationUserId).ToList().Count();
+            _unitOfWork.ShoppingCard.Remove(cart);
+            _unitOfWork.Save();
+            HttpContext.Session.SetInt32(SD.ssShoppingCard, cnt - 1);
+
+            return RedirectToAction(nameof(Index));
         }
     }
 }
