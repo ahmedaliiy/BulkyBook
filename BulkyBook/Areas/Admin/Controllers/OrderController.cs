@@ -1,5 +1,6 @@
 ﻿using BulkyBook.DataAccess.Repository.IRepository;
 using BulkyBook.Models;
+using BulkyBook.Models.ViewModels;
 using BulkyBook.Utility;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -15,6 +16,9 @@ namespace BulkyBook.Areas.Admin.Controllers
     {
         private readonly IUnitOfWork _unitOfWork;
 
+        [BindProperty]
+        public OrderDetailsVM OrdersVM { get; set; }
+
         public OrderController(IUnitOfWork unitOfWork)
         {
             _unitOfWork = unitOfWork;
@@ -23,6 +27,16 @@ namespace BulkyBook.Areas.Admin.Controllers
         public IActionResult Index()
         {
             return View();
+        }
+
+        public IActionResult Details(int id)
+        {
+            OrdersVM = new OrderDetailsVM()
+            {
+                OrderHeader = _unitOfWork.OrderHeader.GetFirstOrDefault(u => u.Id == id, includeProperties: "ApplicationUser"),
+                OrderDetails = _unitOfWork.OrderDetails.GetAll(o => o.Id == id, includeProperties: "Product")
+            };
+            return View(OrdersVM);
         }
 
         #region API CALLS
@@ -38,7 +52,9 @@ namespace BulkyBook.Areas.Admin.Controllers
             if (User.IsInRole(SD.Role_Admin) || User.IsInRole(SD.Role_Employee))
                 orderHeaderList = _unitOfWork.OrderHeader.GetAll(includeProperties: "ApplicationUser");
             else
-                orderHeaderList = _unitOfWork.OrderHeader.GetAll(includeProperties: "ApplicationUser");
+                orderHeaderList = _unitOfWork.OrderHeader.GetAll(
+                                        u => u.ApplicationUserId == claim.Value,
+                                        includeProperties: "ApplicationUser");
 
             switch (status)
             {

@@ -9,7 +9,6 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.WebUtilities;
 using Stripe;
 using System;
-using System.Collections.Generic;
 using System.Linq;
 using System.Security.Claims;
 using System.Text;
@@ -174,7 +173,6 @@ namespace BulkyBook.Areas.Customer.Controllers
             _unitOfWork.OrderHeader.Add(shoppingCardVM.OrderHeader);
             _unitOfWork.Save();
 
-            List<OrderDetails> orderDetailsList = new List<OrderDetails>();
             foreach (var item in shoppingCardVM.ListCard)
             {
                 item.Price = SD.GetPriceBasedOnQuantity(item.Count, item.Product.Price, item.Product.Price50, item.Product.Price100);
