@@ -7,9 +7,10 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-
+using System.Threading.Tasks;
 namespace BulkyBook.Areas.Admin.Controllers
 {
     [Area("Admin")]
@@ -30,12 +31,13 @@ namespace BulkyBook.Areas.Admin.Controllers
             return View();
         }
 
-        public IActionResult Upsert(int? id)
+        public async Task<IActionResult> Upsert(int? id)
         {
+            IEnumerable<Category> CatList = await _unitOfWork.Category.GetAllAsync();
             ProductVM productVM = new ProductVM()
             {
                 Product = new Product(),
-                CategoryList = _unitOfWork.Category.GetAll().Select(i => new SelectListItem
+                CategoryList = CatList.Select(i => new SelectListItem
                 {
                     Text = i.Name,
                     Value = i.Id.ToString()
@@ -47,16 +49,23 @@ namespace BulkyBook.Areas.Admin.Controllers
                 })
             };
             if (id == null)
+            {
+                //this is for create
                 return View(productVM);
+            }
+            //this is for edit
             productVM.Product = _unitOfWork.Product.Get(id.GetValueOrDefault());
             if (productVM.Product == null)
+            {
                 return NotFound();
+            }
             return View(productVM);
+
         }
 
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public IActionResult Upsert(ProductVM productVM)
+        public async Task<IActionResult> Upsert(ProductVM productVM)
         {
             if (ModelState.IsValid)
             {
@@ -66,23 +75,27 @@ namespace BulkyBook.Areas.Admin.Controllers
                 {
                     string fileName = Guid.NewGuid().ToString();
                     var uploads = Path.Combine(webRootPath, @"images\products");
-                    var extenstions = Path.GetExtension(files[0].FileName);
+                    var extenstion = Path.GetExtension(files[0].FileName);
 
                     if (productVM.Product.ImageUrl != null)
                     {
+                        //this is an edit and we need to remove old image
                         var imagePath = Path.Combine(webRootPath, productVM.Product.ImageUrl.TrimStart('\\'));
                         if (System.IO.File.Exists(imagePath))
+                        {
                             System.IO.File.Delete(imagePath);
+                        }
                     }
-                    using (var fileStreams = new FileStream(Path.Combine(uploads, fileName +extenstions), FileMode.Create))
+                    using (var filesStreams = new FileStream(Path.Combine(uploads, fileName + extenstion), FileMode.Create))
                     {
-                        files[0].CopyTo(fileStreams);
+                        files[0].CopyTo(filesStreams);
                     }
-                    productVM.Product.ImageUrl = @"\images\products\" + fileName + extenstions;
+                    productVM.Product.ImageUrl = @"\images\products\" + fileName + extenstion;
                 }
                 else
                 {
-                    if(productVM.Product.Id != 0)
+                    //update when they do not change the image
+                    if (productVM.Product.Id != 0)
                     {
                         Product objFromDb = _unitOfWork.Product.Get(productVM.Product.Id);
                         productVM.Product.ImageUrl = objFromDb.ImageUrl;
@@ -91,15 +104,21 @@ namespace BulkyBook.Areas.Admin.Controllers
 
 
                 if (productVM.Product.Id == 0)
+                {
                     _unitOfWork.Product.Add(productVM.Product);
+
+                }
                 else
+                {
                     _unitOfWork.Product.Update(productVM.Product);
+                }
                 _unitOfWork.Save();
                 return RedirectToAction(nameof(Index));
             }
             else
             {
-                productVM.CategoryList = _unitOfWork.Category.GetAll().Select(i => new SelectListItem
+                IEnumerable<Category> CatList = await _unitOfWork.Category.GetAllAsync();
+                productVM.CategoryList = CatList.Select(i => new SelectListItem
                 {
                     Text = i.Name,
                     Value = i.Id.ToString()
@@ -109,13 +128,14 @@ namespace BulkyBook.Areas.Admin.Controllers
                     Text = i.Name,
                     Value = i.Id.ToString()
                 });
-                if(productVM.Product.Id != 0)
+                if (productVM.Product.Id != 0)
                 {
                     productVM.Product = _unitOfWork.Product.Get(productVM.Product.Id);
                 }
             }
             return View(productVM);
         }
+
 
         #region API CALLS
 
@@ -131,14 +151,19 @@ namespace BulkyBook.Areas.Admin.Controllers
         {
             var objFromDb = _unitOfWork.Product.Get(id);
             if (objFromDb == null)
+            {
                 return Json(new { success = false, message = "Error while deleting" });
+            }
             string webRootPath = _hostEnvironment.WebRootPath;
             var imagePath = Path.Combine(webRootPath, objFromDb.ImageUrl.TrimStart('\\'));
             if (System.IO.File.Exists(imagePath))
+            {
                 System.IO.File.Delete(imagePath);
+            }
             _unitOfWork.Product.Remove(objFromDb);
             _unitOfWork.Save();
-            return Json(new { success = true, message = "Deleted successfully" });
+            return Json(new { success = true, message = "Delete Successful" });
+
         }
 
         #endregion
